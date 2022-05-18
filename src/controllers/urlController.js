@@ -1,6 +1,28 @@
 const urlModel = require("../models/urlModel")
 const validUrl = require('valid-url')
 const shortid = require('shortid')
+const redis = require("redis");
+
+const { promisify } = require("util");
+
+//Connect to redis
+
+
+const redisClient = redis.createClient(
+    15299,
+  "redis-15299.c301.ap-south-1-1.ec2.cloud.redislabs.com",
+  { no_ready_check: true }
+);
+redisClient.auth("Gh6C6FL9InvuiPm3mQOgysNHiuvjA6qN", function (err) {
+  if (err) throw err;
+});
+
+redisClient.on("connect", async function () {
+  console.log("Connected to Redis..");
+});
+
+const SET_ASYNC = promisify(redisClient.SET).bind(redisClient);
+const GET_ASYNC = promisify(redisClient.GET).bind(redisClient);
 
 const baseUrl = 'http:localhost:3000'
 
@@ -9,11 +31,11 @@ const creatShortUrl = async (req, res) =>{
         longUrl
     } = req.body // destructure the longUrl from req.body.longUrl
 
-    // check base url if valid using the validUrl.isUri method
-       const isValidUrl = /^(?:(?:https?|ftp):\/\/)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:\/\S*)?$/
-    if (!validUrl.isUri(baseUrl)) {
-        return res.status(401).json('Invalid base URL')
-    }
+    // check base url if valid using the validUrl using regex method
+       const isValidUrl = /(ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-/]))?/
+    // if (!validUrl.isUri(baseUrl)) {
+    //     return res.status(401).json('Invalid base URL')
+    // }
 
     // if valid, we create the url code
     const urlCode = shortid.generate()
@@ -32,7 +54,7 @@ const creatShortUrl = async (req, res) =>{
 
             // url exist and return the respose
             if (url) {
-                res.status(400).send({status:false,msg:"url already exist"})
+                res.status(400).send({status:false,msg:"shorternurl already generated on this longUrl"})
             } else {
                 // join the generated short code the the base url
                 const shortUrl = baseUrl + '/' + urlCode
@@ -45,6 +67,7 @@ const creatShortUrl = async (req, res) =>{
                     date: new Date()
                 })
                 await url.save()
+                await SET_ASYNC(`${url}`, JSON.stringify(url))
                 res.status(201).send({status:true , msg:"Url created Sucessfully", data:url})
             }
         }
@@ -55,6 +78,18 @@ const creatShortUrl = async (req, res) =>{
         }
     } 
 }
+
+const fetchurlCode = async function (req, res) {
+    let cahcedurlCodeData = await GET_ASYNC(`${req.params.urlCode}`)
+    if(cahcedurlCodeData) {
+      res.send(cahcedurlCodeData)
+    } else {
+      let urlCode = await urlModel.findById(req.params.urlCode);
+      await SET_ASYNC(`${req.params.urlCode}`, JSON.stringify(profile))
+      res.send({ data: urlCode });
+    }
+  
+  };
 
 const getOriginalUrl = async (req, res) => {
     try {
@@ -82,3 +117,4 @@ const getOriginalUrl = async (req, res) => {
 
 module.exports.creatShortUrl = creatShortUrl
 module.exports.getOriginalUrl=getOriginalUrl
+module.exports.fetchurlCode= fetchurlCode
