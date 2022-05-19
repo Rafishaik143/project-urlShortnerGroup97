@@ -23,9 +23,11 @@ app.use((req, res, next) => {
     res.status(404).send({
         status: 404,
         error: `Not found ${req.url}`
+        
     })
+    next()
 })
-const baseUrl = 'http:localhost:3000'
+
 
 app.listen(process.env.PORT || 3000, (err)=> {
     console.log("Connected to PORT 3000")

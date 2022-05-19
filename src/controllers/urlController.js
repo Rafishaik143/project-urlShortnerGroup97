@@ -32,7 +32,7 @@ const creatShortUrl = async (req, res) =>{
     } = req.body // destructure the longUrl from req.body.longUrl
 
     // check base url if valid using the validUrl using regex method
-       const isValidUrl = /(ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-/]))?/
+       const isValidUrl = /^(?:(?:(?:https?|ftp):)?\/\/)(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z0-9\u00a1-\uffff][a-z0-9\u00a1-\uffff_-]{0,62})?[a-z0-9\u00a1-\uffff]\.)+(?:[a-z\u00a1-\uffff]{2,}\.?))(?::\d{2,5})?(?:[/?#]\S*)?$/i
     // if (!validUrl.isUri(baseUrl)) {
     //     return res.status(401).json('Invalid base URL')
     // }
@@ -60,13 +60,14 @@ const creatShortUrl = async (req, res) =>{
                 const shortUrl = baseUrl + '/' + urlCode
 
                 // invoking the Url model and saving to the DB
-                url = new urlModel({
+                const createdurl = new urlModel({
                     longUrl,
                     shortUrl,
                     urlCode,
-                    date: new Date()
+                
                 })
                 await url.save()
+                console.log(url)
                 await SET_ASYNC(`${url}`, JSON.stringify(url))
                 res.status(201).send({status:true , msg:"Url created Sucessfully", data:url})
             }
@@ -79,42 +80,42 @@ const creatShortUrl = async (req, res) =>{
     } 
 }
 
-const fetchurlCode = async function (req, res) {
-    let cahcedurlCodeData = await GET_ASYNC(`${req.params.urlCode}`)
-    if(cahcedurlCodeData) {
-      res.send(cahcedurlCodeData)
-    } else {
-      let urlCode = await urlModel.findById(req.params.urlCode);
-      await SET_ASYNC(`${req.params.urlCode}`, JSON.stringify(profile))
-      res.send({ data: urlCode });
-    }
-  
-  };
 
-const getOriginalUrl = async (req, res) => {
+
+let getOriginalUrl = async function (req, res) {
     try {
-
-        // find a document match to the code in req.params.code
-
-        const url = await urlModel.findOne({
-            urlCode: req.params.urlCode
-        })
-        if (url) {
-            // when valid we perform a redirect
-            return res.redirect(url.longUrl)
-        } else {
-            // else return a not found 404 status
-            return res.status(404).send({staus:false, masg:'No URL Found'})
+      let requestParams = req.params.urlCode;
+  
+      let cachesUrlData = await GET_ASYNC(`${requestParams}`);
+  
+      //convert to object
+      const urlData = JSON.parse(cachesUrlData);
+      if (cachesUrlData) {
+        console.log("cache");
+        return res.redirect(urlData.longUrl);
+      } else {
+        let findUrlCode = await urlModel
+          .findOne({ urlCode: requestParams })
+          .select({ urlCode: 1, longUrl: 1, shortUrl: 1 });
+  
+        if (!findUrlCode) {
+          return res
+            .status(404)
+            .send({ status: false, message: "Not found this url code." });
         }
+  
+        // res.redirect(findUrlCode.longUrl)
+        await SET_ASYNC(`${requestParams}`, JSON.stringify(findUrlCode));
+        res.redirect(findUrlCode.longUrl);
+      }
+    } catch (error) {
+      res.status(500).send({ status: false, message: error.message });
+    }
+  };
+  
 
-    }
-    // exception handler
-    catch (err) {
-        console.error(err)
-        res.status(500).send({staus:false, error: err.message})
-    }
-}
+
+
 
 module.exports.creatShortUrl = creatShortUrl
 module.exports.getOriginalUrl=getOriginalUrl
-module.exports.fetchurlCode= fetchurlCode
