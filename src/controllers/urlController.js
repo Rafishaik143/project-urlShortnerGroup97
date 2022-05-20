@@ -97,14 +97,14 @@ let getOriginalUrl = async function (req, res) {
   
       let cachesUrlData = await GET_ASYNC(`${requestParams}`);
 
-      console.log(cachesUrlData)   
+      //console.log(cachesUrlData)   
       //convert to object
       const urlData = JSON.parse(cachesUrlData);
       
-      console.log(urlData)
+      //console.log(urlData)
       if (cachesUrlData) {
         console.log("cache");
-        return res.redirect(urlData.longUrl);
+        return res.status(302).redirect(urlData.longUrl);
       } else {
         let findUrlCode = await urlModel
           .findOne({ urlCode: requestParams })
@@ -116,7 +116,7 @@ let getOriginalUrl = async function (req, res) {
         }
   
         // res.redirect(findUrlCode.longUrl)
-        await SET_ASYNC(`${requestParams}`, JSON.stringify(findUrlCode));
+        await SET_ASYNC(`${requestParams}`, JSON.stringify(findUrlCode.longUrl));
         res.status(302).redirect(findUrlCode.longUrl);
       }
     } catch (error) {
